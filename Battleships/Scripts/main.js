@@ -24,7 +24,7 @@ function attachEventToAITiles() {
 
 function getRandomShips() {
     if ($('#randomShips').hasClass("horizontalMenuButton")) {
-        fetch("http://localhost:53627/Home/GetRandomShips")
+        fetch(getQueryPath("Home/GetRandomShips"))
         .then(function (resp) {
             return resp.json();
         })
@@ -85,7 +85,7 @@ function changeSectionDisplay(vanishDiv, displayDiv) {
 
 function startGame() {
     if ($('#startGame').hasClass("horizontalMenuButton")) {
-        fetch("http://localhost:53627/Home/StartGame",
+        fetch(getQueryPath("Home/StartGame"),
     {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -143,7 +143,7 @@ function changeButtonAccess(buttonId) {
 
 function shoot(index) {
     if ($('#randomShot').hasClass("horizontalMenuButton")) {
-        fetch("http://localhost:53627/Home/Shoot",
+        fetch(getQueryPath("Home/Shoot"),
         {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -160,7 +160,7 @@ function shoot(index) {
 
 function shootRandomly() {
     if ($('#randomShot').hasClass("horizontalMenuButton")) {
-        fetch("http://localhost:53627/Home/ShootRandomly",
+        fetch(getQueryPath("Home/ShootRandomly"),
         {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -188,7 +188,7 @@ function resolveShot(list) {
 }
 
 function aiShot() {
-    fetch("http://localhost:53627/Home/AIShot",
+    fetch(getQueryPath("Home/AIShot"),
         {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -225,7 +225,7 @@ function aiShot() {
 }
 
 function checkVictoryOrDefeat(shotAt) {
-    fetch("http://localhost:53627/Home/CheckVictoryOrDefeat",
+    fetch(getQueryPath("Home/CheckVictoryOrDefeat"),
         {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -288,6 +288,10 @@ function getActionTime() {
         return minute + " : " + second;
     else
         return hour + " : " + minute + " : " + second;
+}
+
+function getQueryPath(address) {
+    return window.location.protocol + "//" + window.location.host + "/" + address;
 }
 
 $("#playButton").on("click", function () { changeSectionDisplay("mainMenuSection", "boardSection") });
