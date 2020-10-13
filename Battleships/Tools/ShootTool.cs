@@ -10,17 +10,17 @@ namespace Battleships.Tools
     {
         public static void TryShot(Game game, int index, ShotAt shotAt, List<GameEventDTO> gameEventDTOList)
         {
-            
             if (game == null)
             {
                 return;
             }
 
             GameEventDTO gameEventDTO = new GameEventDTO();
+            gameEventDTO.Sequence = game.Sequence;
             gameEventDTO.Tile = shotAt == ShotAt.aiTile ? game.AITiles[index] : game.PlayerTiles[index];
             gameEventDTO.Index = index;
 
-            var tiles = shotAt == ShotAt.aiTile ? game.AITiles : game.PlayerTiles;
+             var tiles = shotAt == ShotAt.aiTile ? game.AITiles : game.PlayerTiles;
 
             if (gameEventDTO.Tile == Tile.water)
             {
@@ -45,6 +45,7 @@ namespace Battleships.Tools
                 gameEventDTO.Tile = Tile.drowned;
                 gameEventDTOList.Add(gameEventDTO);
 
+                //If player tile was hit make diagonal tiles unavaible
                 if (shotAt == ShotAt.playerTile)
                 {
                     MarkAnavaibleDiagonalTiles(index, tiles);
@@ -92,6 +93,7 @@ namespace Battleships.Tools
                 if (item.Value && tiles.ContainsKey(item.Key) && tiles[item.Key] == Tile.shot)
                 {
                     GameEventDTO oppositeGameEventDTO = new GameEventDTO();
+                    oppositeGameEventDTO.IsVisible = false;
                     oppositeGameEventDTO.Index = item.Key;
                     oppositeGameEventDTO.Tile = Tile.drowned;
                     gameEventDTOList.Add(oppositeGameEventDTO);

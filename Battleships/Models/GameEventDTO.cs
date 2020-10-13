@@ -9,6 +9,10 @@ namespace Battleships.Models
 {
     public class GameEventDTO
     {
+        public GameEventDTO()
+        {
+            IsVisible = true;
+        }
         public long GameNumber { get; set; }
         [JsonConverter(typeof(StringEnumConverter))]
         public ShotAt ShotAt { get; set; }
@@ -16,6 +20,7 @@ namespace Battleships.Models
         [JsonConverter(typeof(StringEnumConverter))]
         public Tile Tile { get; set; }
         public int Sequence { get; set; }
+        public bool IsVisible { get; set; }
     }
     public enum ShotAt { aiTile, playerTile}
 }

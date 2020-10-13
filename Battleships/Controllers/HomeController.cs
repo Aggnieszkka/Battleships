@@ -38,8 +38,10 @@ namespace Battleships.Controllers
         }
         public string ShootRandomly(int gameNumber)
         {
-            List<GameEventDTO> gameEventDTOList = new List<GameEventDTO>();
             var game = Games.FirstOrDefault(g => g.GameNumber == gameNumber);
+            List<GameEventDTO> gameEventDTOList = new List<GameEventDTO>();
+
+            game.Sequence++;
             var avaibleTiles = game.AITiles.Where(t => t.Value == Tile.water || t.Value == Tile.ship).Select(t => t.Key).ToList();
             if (avaibleTiles.Count > 0)
             {
@@ -53,24 +55,53 @@ namespace Battleships.Controllers
         {
             var game = Games.FirstOrDefault(g => g.GameNumber == gameNumber);
             List<GameEventDTO> gameEventDTOList = new List<GameEventDTO>();
+            game.Sequence++;
             ShootTool.TryShot(game, index, ShotAt.aiTile, gameEventDTOList);
+
             return Newtonsoft.Json.JsonConvert.SerializeObject(gameEventDTOList);
         }
         public string AIShot(int gameNumber)
         {
             List<GameEventDTO> gameEventDTOList = new List<GameEventDTO>();
             var game = Games.FirstOrDefault(g => g.GameNumber == gameNumber);
-            var avaibleTiles = game.PlayerTiles.Where(t => t.Value == Tile.water || t.Value == Tile.ship).Select(t => t.Key).ToList();
-            if (avaibleTiles.Count > 0)
+            var tiles = game.PlayerTiles.Select(t => t.Key).ToList();
+
+            Random random = new Random(Guid.NewGuid().GetHashCode());
+            List<int> avaibleTiles = new List<int>();
+
+            do
             {
-                Random random = new Random(Guid.NewGuid().GetHashCode());
-                do
+                avaibleTiles = game.PlayerTiles.Where(t => t.Value == Tile.water || t.Value == Tile.ship).Select(t => t.Key).ToList();
+
+                if (avaibleTiles.Count > 0)
                 {
+                    //If there are player tiles shot make only opposite tiles avaible
+                    if (game.PlayerTiles.ContainsValue(Tile.shot))
+                    {
+                        foreach (var playerTile in game.PlayerTiles.Where(p => p.Value == Tile.shot))
+                        {
+                            var index = playerTile.Key;
+                            avaibleTiles = new List<int>();
+
+                            var avaibleTilesDictionary = LocateShipTool.AreOppositeTilesAvaible(tiles, index);
+                            foreach (var avaibleTile in avaibleTilesDictionary)
+                            {
+                                if (avaibleTile.Value && (game.PlayerTiles[avaibleTile.Key] == Tile.ship || game.PlayerTiles[avaibleTile.Key] == Tile.water))
+                                {
+                                    avaibleTiles.Add(avaibleTile.Key);
+                                }
+                            }
+                            if (avaibleTiles.Count > 0)
+                            {
+                                break;
+                            }
+                        }
+                    }
                     var randomIndex = random.Next(0, avaibleTiles.Count - 1);
                     ShootTool.TryShot(game, avaibleTiles[randomIndex], ShotAt.playerTile, gameEventDTOList);
-                } while (gameEventDTOList[gameEventDTOList.Count - 1].Tile != Tile.missed);
+                }
+            } while (gameEventDTOList[gameEventDTOList.Count - 1].Tile != Tile.missed && game.PlayerTiles.ContainsValue(Tile.ship));
 
-            }
             return Newtonsoft.Json.JsonConvert.SerializeObject(gameEventDTOList);
         }
 

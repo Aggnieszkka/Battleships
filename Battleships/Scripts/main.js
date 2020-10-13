@@ -51,11 +51,17 @@ function placePlayerShips(idArray) {
 function revealTile(id, type) {
     var chosenType;
     if (type == "missed") {
-        $("#historyInfo").html(getActionTime() + "<span style='color: green'> -- Missed. Computer's turn.<br/></span>" + $("#historyInfo").html());
+        $("#historyInfo").html(getActionTime()
+            + "<span style='color: green'> -- Missed. Computer's turn. Shot count: "
+            + gameSequence + "<br/></span>"
+            + $("#historyInfo").html());
         chosenType = "url(../img/missed.png)";
     }
     else if (type == "shot") {
-        $("#historyInfo").html(getActionTime() + "<span style='color: green'> -- Hit! You have one more try.<br/></span>" + $("#historyInfo").html());
+        $("#historyInfo").html(getActionTime()
+            + "<span style='color: green'> -- Hit! You have one more try. Shot count: "
+            + gameSequence + "<br/></span>"
+            + $("#historyInfo").html());
         chosenType = "url(../img/shot.png)";
     }
     else if (type == "ship") {
@@ -142,7 +148,7 @@ function changeButtonAccess(buttonId) {
 }
 
 function shoot(index) {
-    if ($('#randomShot').hasClass("horizontalMenuButton")) {
+    if ($('#randomShot').hasClass("horizontalMenuButton") && tileLock == false) {
         fetch(getQueryPath("Home/Shoot"),
         {
             method: 'POST',
@@ -159,7 +165,7 @@ function shoot(index) {
 }
 
 function shootRandomly() {
-    if ($('#randomShot').hasClass("horizontalMenuButton")) {
+    if ($('#randomShot').hasClass("horizontalMenuButton") && tileLock == false) {
         fetch(getQueryPath("Home/ShootRandomly"),
         {
             method: 'POST',
@@ -176,10 +182,18 @@ function shootRandomly() {
 }
 
 function resolveShot(list) {
+    gameSequence = list[0].Sequence;
+    tileLock = true;
     for (i = 0; i < list.length; i++) {
-        revealTile("AITile" + list[i].Index, list[i].Tile);
+        setTimeout(function (list, i) {            
+            revealTile("AITile" + list[i].Index, list[i].Tile);
+            if (i == list.length - 1) {
+                tileLock = false;
+            }
+        }, 300 * i, list, i);
     }
     if (list[0].Tile == "drowned") {
+        gameSequence = list[0].Sequence;
         checkVictoryOrDefeat("aiTile");
     }
     if (list[0].Tile == "missed" && playerWon == false) {
@@ -198,30 +212,52 @@ function aiShot() {
             return resp.json();
         })
         .then(function (list) {
+
+            tileLock = true;
             for (i = 0; i < list.length; i++) {
-                var chosenType;
-                if (list[i].Tile == "missed") {
-                    chosenType = "url(../img/missed.png)";
-                    $("#historyInfo").html(getActionTime() + "<span style='color: red'> -- Missed. Your turn!<br/></span>" + $("#historyInfo").html());
-                }
-                else if (list[i].Tile == "shot") {
-                    chosenType = "url(../img/shot.png)";
-                    $("#historyInfo").html(getActionTime() + "<span style='color: red'> -- Hit! Computer gets another try.<br/></span>" + $("#historyInfo").html());
-
-                }
-                else if (list[i].Tile == "drowned") {
-                    chosenType = "url(../img/drowned.png)";
-                }
-                else {
-                    return;
-                }
-
-                $("#playerTile" + list[i].Index).css('backgroundImage', chosenType);
-            }
-            if (list[0].Tile == "drowned") {
-                checkVictoryOrDefeat("playerTile");
+                setTimeout(function (list, i) {
+                    markPlayerTiles(list[i].Tile, list[i].Index, list[i].IsVisible);
+                    if (i == list.length - 1) {
+                        tileLock = false;
+                        if (list.map(function (item) {
+                         return item.Tile;
+                        }).includes("drowned")) {
+                            checkVictoryOrDefeat("playerTile");
+                        }
+                    }
+                }, 300 * (i + 1), list, i);
             }
         });
+}
+
+function markPlayerTiles(tile, index, visible) {
+    var chosenType;
+    if (tile == "missed") {
+        chosenType = "url(../img/missed.png)";
+        $("#historyInfo").html(getActionTime()
+            + "<span style='color: red'> -- Missed. Your turn!<br/></span>"
+            + $("#historyInfo").html());
+    }
+    else if (tile == "shot") {
+        chosenType = "url(../img/shot.png)";
+        $("#historyInfo").html(getActionTime()
+            + "<span style='color: red'> -- Hit! Computer gets another try.<br/></span>"
+            + $("#historyInfo").html());
+
+    }
+    else if (tile == "drowned") {
+        chosenType = "url(../img/drowned.png)";
+        if (visible) {
+            $("#historyInfo").html(getActionTime()
+        + "<span style='color: red'> -- Drowned! Computer gets another try.<br/></span>"
+        + $("#historyInfo").html());
+        }
+    }
+    else {
+        return;
+    }
+
+    $("#playerTile" + index).css('backgroundImage', chosenType);
 }
 
 function checkVictoryOrDefeat(shotAt) {
@@ -236,20 +272,26 @@ function checkVictoryOrDefeat(shotAt) {
         })
         .then(function (ended) {
             if (shotAt == "aiTile" && ended) {
-                $("#historyInfo").html(getActionTime() + " -- PLAYER WINS !<br/>" + $("#historyInfo").html());
+                $("#historyInfo").html(getActionTime()
+                    + " -- PLAYER WINS AT "
+                    + gameSequence
+                    + " SHOTS!<br/>"
+                    + $("#historyInfo").html());
                 playerWon = true;
                 removeEventFromAITiles();
             }
             else if (shotAt == "playerTile" && ended) {
-                $("#historyInfo").html(getActionTime() + " -- COMPUTER WINS !<br/>" + $("#historyInfo").html());
+                $("#historyInfo").html(getActionTime()
+                    + " -- COMPUTER WINS !<br/>"
+                    + $("#historyInfo").html());
                 AIWon = true;
                 removeEventFromAITiles();
             }
             else if (shotAt == "aiTile" && !ended) {
-                $("#historyInfo").html(getActionTime() + "<span style='color: green'> -- Drowned! You have one more try.<br/></span>" + $("#historyInfo").html());
-            }
-            else if (shotAt == "playerTile" && !ended) {
-                $("#historyInfo").html(getActionTime() + "<span style='color: red'> -- Drowned! Computer gets another try.<br/></span>" + $("#historyInfo").html());
+                $("#historyInfo").html(getActionTime()
+                    + "<span style='color: green'> -- Drowned! You have one more try. Shot count: "
+                    + gameSequence + "<br/></span>"
+                    + $("#historyInfo").html());
             }
         });
 }
@@ -282,9 +324,9 @@ function getActionTime() {
         minute = "0" + minute;
     let second = Math.floor(time % 3600 % 60);
     if (second < 10)
-            second = "0" + second;
+        second = "0" + second;
 
-    if(hour==0)
+    if (hour == 0)
         return minute + " : " + second;
     else
         return hour + " : " + minute + " : " + second;
@@ -308,8 +350,10 @@ showBoards();
 
 var shipArray = [];
 var gameNumber;
+var gameSequence;
 var playerWon = false;
 var AIWon = false;
+var tileLock = false;
 
 var startHour;
 var startMinute;
