@@ -20,7 +20,7 @@ namespace Battleships.Tools
             gameEventDTO.Tile = shotAt == ShotAt.aiTile ? game.AITiles[index] : game.PlayerTiles[index];
             gameEventDTO.Index = index;
 
-             var tiles = shotAt == ShotAt.aiTile ? game.AITiles : game.PlayerTiles;
+            var tiles = shotAt == ShotAt.aiTile ? game.AITiles : game.PlayerTiles;
 
             if (gameEventDTO.Tile == Tile.water)
             {
@@ -51,7 +51,7 @@ namespace Battleships.Tools
                     MarkAnavaibleDiagonalTiles(index, tiles);
                 }
 
-                AddOppositeDrownedTiles(gameEventDTOList, tiles, index);
+                AddOppositeDrownedTiles(gameEventDTOList, tiles, index, shotAt);
             }
         }
 
@@ -81,7 +81,7 @@ namespace Battleships.Tools
             return true;
         }
 
-        public static void AddOppositeDrownedTiles(List<GameEventDTO> gameEventDTOList, Dictionary<int, Tile> tiles, int index)
+        public static void AddOppositeDrownedTiles(List<GameEventDTO> gameEventDTOList, Dictionary<int, Tile> tiles, int index, ShotAt shotAt)
         {
             var indexList = tiles.Select(t => t.Key).ToList();
             var oppositeTiles = LocateShipTool.AreOppositeTilesAvaible(indexList, index);
@@ -90,15 +90,41 @@ namespace Battleships.Tools
 
             foreach (var item in oppositeTiles)
             {
+                //find already shot tile next to drowned tile
                 if (item.Value && tiles.ContainsKey(item.Key) && tiles[item.Key] == Tile.shot)
                 {
+                    //change shot tile to drowned tile and add to list of events
                     GameEventDTO oppositeGameEventDTO = new GameEventDTO();
                     oppositeGameEventDTO.IsVisible = false;
                     oppositeGameEventDTO.Index = item.Key;
                     oppositeGameEventDTO.Tile = Tile.drowned;
                     gameEventDTOList.Add(oppositeGameEventDTO);
 
-                    AddOppositeDrownedTiles(gameEventDTOList, tiles, oppositeGameEventDTO.Index);
+                    //if there are any water tiles around mark them as missed for smarter AI shots
+                    if (shotAt == ShotAt.playerTile)
+                    {
+                        var tilesToMark = LocateShipTool.AreOppositeTilesAvaible(indexList, item.Key);
+                        foreach (var tile in tilesToMark)
+                        {
+                            if (tile.Value && tiles[tile.Key] == Tile.water)
+                            {
+                                tiles[tile.Key] = Tile.missed;
+                            }
+                        }
+                    }
+
+                    AddOppositeDrownedTiles(gameEventDTOList, tiles, oppositeGameEventDTO.Index, shotAt);
+                }
+            }
+            //if it is one-tile ship mark water tiles around as missed
+            if (!tiles.Any(t => t.Value == Tile.shot && oppositeTiles.Any(o => o.Key == t.Key && o.Value)))
+            {
+                foreach (var tile in oppositeTiles)
+                {
+                    if (tile.Value && tiles[tile.Key] == Tile.water)
+                    {
+                        tiles[tile.Key] = Tile.missed;
+                    }
                 }
             }
         }
