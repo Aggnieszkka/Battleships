@@ -26,6 +26,7 @@
 }
 
 .menuButton {
+    letter-spacing:2px;
     width:100%;
     height:100px;
     margin-top: 20px;
@@ -35,6 +36,7 @@
 }
 
 .unclickableMenuButton {
+    letter-spacing:2px;
     width:100%;
     height:100px;
     margin-top: 20px;
@@ -56,6 +58,7 @@
 }
 
 .horizontalMenuButton{
+    letter-spacing:1px;
     display:inline-block;
     padding-right:20px;
     padding-left:20px;
@@ -71,6 +74,7 @@
 }
 
 .unclickableButton {
+    letter-spacing:1px;
     display:inline-block;
     padding-right:20px;
     padding-left:20px;
@@ -137,4 +141,25 @@
     filter:brightness(100%);
     cursor:default;
     background-image:url(../img/water.png);
+}
+#aboutSection {
+    display:none;
+}
+#aboutTable {
+    overflow-y: scroll;
+    height:500px;
+    padding-left:130px;
+    padding-right:130px;
+    background-color: #222222;
+    color:#ffffff;
+    border: 2px inset #808080;
+    font-family: 'Lato', sans-serif;
+    font-size:15px;
+}
+#aboutTable > .row > h4 {
+    color: #e9b64a;
+}
+#aboutTable > .row > h2 {
+color: #e9b64a;
+text-align: center;
 }

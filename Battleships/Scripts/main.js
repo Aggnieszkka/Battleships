@@ -338,13 +338,14 @@ function getQueryPath(address) {
 
 $("#playButton").on("click", function () { changeSectionDisplay("mainMenuSection", "boardSection") });
 //$("#rankingButton").on("click", function () { changeSectionDisplay("mainMenuSection", "ranking") });
-//$("#aboutButton").on("click", function () { changeSectionDisplay("mainMenuSection", "about") });
+$("#aboutButton").on("click", function () { changeSectionDisplay("mainMenuSection", "aboutSection") });
 
 $("#randomShips").on("click", function () { getRandomShips() });
 $("#startGame").on("click", function () { startGame() });
 $("#randomShot").on("click", function () { shootRandomly() });
 $("#newGame").on("click", function () { startNewGame() });
-$("#goToMainMenu").on("click", function () { changeSectionDisplay("boardSection", "mainMenuSection") });
+$("#goToMainMenu").on("click", function () { changeSectionDisplay("boardSection", "mainMenuSection"); startNewGame(); $("#historyInfo").html(""); });
+$("#goFromAboutToMainMenu").on("click", function () { changeSectionDisplay("aboutSection", "mainMenuSection") });
 
 showBoards();
 
