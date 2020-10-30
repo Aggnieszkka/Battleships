@@ -1,6 +1,7 @@
 ﻿using Battleships.Models;
 using System;
 using System.Collections.Generic;
+using System.Data.Entity;
 using System.Linq;
 using System.Web;
 
@@ -8,7 +9,7 @@ namespace Battleships.Tools
 {
     public static class ShootTool
     {
-        public static void TryShot(Game game, int index, ShotAt shotAt, List<GameEventDTO> gameEventDTOList)
+        public static void TryShot(DbContext database, Game game, int index, ShotAt shotAt, List<GameEventDTO> gameEventDTOList)
         {
             if (game == null)
             {
@@ -16,42 +17,48 @@ namespace Battleships.Tools
             }
 
             GameEventDTO gameEventDTO = new GameEventDTO();
+            SetEventTime(game, gameEventDTO);
             gameEventDTO.Sequence = game.Sequence;
-            gameEventDTO.Tile = shotAt == ShotAt.aiTile ? game.AITiles[index] : game.PlayerTiles[index];
+            gameEventDTO.Tile = shotAt == ShotAt.aiTile ? game.AITiles[index].Type : game.PlayerTiles[index].Type;
             gameEventDTO.Index = index;
 
             var tiles = shotAt == ShotAt.aiTile ? game.AITiles : game.PlayerTiles;
 
-            if (gameEventDTO.Tile == Tile.water)
+            if (gameEventDTO.Tile == TileType.water)
             {
-                tiles[index] = Tile.missed;
-                gameEventDTO.Tile = Tile.missed;
+                tiles[index].Type = TileType.missed;
+                database.Entry(tiles[index]).State = EntityState.Modified;
+
+                gameEventDTO.Tile = TileType.missed;
                 gameEventDTOList.Add(gameEventDTO);
 
             }
-            else if (gameEventDTO.Tile == Tile.ship && !CheckIfDrowned(index, tiles))
+            else if (gameEventDTO.Tile == TileType.ship && !CheckIfDrowned(index, tiles))
             {
-                tiles[index] = Tile.shot;
-                gameEventDTO.Tile = Tile.shot;
+                tiles[index].Type = TileType.shot;
+                database.Entry(tiles[index]).State = EntityState.Modified;
+
+                gameEventDTO.Tile = TileType.shot;
                 gameEventDTOList.Add(gameEventDTO);
 
+                //If player tile was hit make diagonal tiles unavaible for smarter AI shots
                 if (shotAt == ShotAt.playerTile)
                 {
-                    MarkAnavaibleDiagonalTiles(index, tiles);
+                    MarkAnavaibleDiagonalTiles(database, index, tiles);
                 }
             }
-            else if (gameEventDTO.Tile == Tile.ship && CheckIfDrowned(index, tiles))
+            else if (gameEventDTO.Tile == TileType.ship && CheckIfDrowned(index, tiles))
             {
-                gameEventDTO.Tile = Tile.drowned;
+                gameEventDTO.Tile = TileType.drowned;
                 gameEventDTOList.Add(gameEventDTO);
 
-                //If player tile was hit make diagonal tiles unavaible
+                //If player tile was hit make diagonal tiles unavaible for smarter AI shots
                 if (shotAt == ShotAt.playerTile)
                 {
-                    MarkAnavaibleDiagonalTiles(index, tiles);
+                    MarkAnavaibleDiagonalTiles(database, index, tiles);
                 }
 
-                AddOppositeDrownedTiles(gameEventDTOList, tiles, index, shotAt);
+                AddOppositeDrownedTiles(database, gameEventDTOList, tiles, index, shotAt);
             }
         }
 
@@ -60,19 +67,19 @@ namespace Battleships.Tools
             var indexList = tiles.Select(t => t.Key).ToList();
             var oppositeTiles = LocateShipTool.AreOppositeTilesAvaible(indexList, index);
 
-            var tilesCopy = tiles.ToDictionary(t => t.Key, t => t.Value);
-            tilesCopy[index] = Tile.water;
+            var tilesCopy = tiles.ToDictionary(t => t.Key, t => new Tile{ Type = t.Value.Type });
+            tilesCopy[index].Type = TileType.water;
 
             foreach (var item in oppositeTiles)
             {
                 var trueIndex = indexList[item.Key];
                 if (item.Value && tilesCopy.ContainsKey(trueIndex))
                 {
-                    if (tilesCopy[trueIndex] == Tile.ship)
+                    if (tilesCopy[trueIndex].Type == TileType.ship)
                     {
                         return false;
                     }
-                    else if (tilesCopy[trueIndex] == Tile.shot && !CheckIfDrowned(item.Key, tilesCopy))
+                    else if (tilesCopy[trueIndex].Type == TileType.shot && !CheckIfDrowned(item.Key, tilesCopy))
                     {
                         return false;
                     }
@@ -81,23 +88,24 @@ namespace Battleships.Tools
             return true;
         }
 
-        public static void AddOppositeDrownedTiles(List<GameEventDTO> gameEventDTOList, Dictionary<int, Tile> tiles, int index, ShotAt shotAt)
+        public static void AddOppositeDrownedTiles(DbContext database, List<GameEventDTO> gameEventDTOList, Dictionary<int, Tile> tiles, int index, ShotAt shotAt)
         {
             var indexList = tiles.Select(t => t.Key).ToList();
             var oppositeTiles = LocateShipTool.AreOppositeTilesAvaible(indexList, index);
 
-            tiles[index] = Tile.drowned;
+            tiles[index].Type = TileType.drowned;
+            database.Entry(tiles[index]).State = EntityState.Modified;
 
             foreach (var item in oppositeTiles)
             {
                 //find already shot tile next to drowned tile
-                if (item.Value && tiles.ContainsKey(item.Key) && tiles[item.Key] == Tile.shot)
+                if (item.Value && tiles.ContainsKey(item.Key) && tiles[item.Key].Type == TileType.shot)
                 {
                     //change shot tile to drowned tile and add to list of events
                     GameEventDTO oppositeGameEventDTO = new GameEventDTO();
                     oppositeGameEventDTO.IsVisible = false;
                     oppositeGameEventDTO.Index = item.Key;
-                    oppositeGameEventDTO.Tile = Tile.drowned;
+                    oppositeGameEventDTO.Tile = TileType.drowned;
                     gameEventDTOList.Add(oppositeGameEventDTO);
 
                     //if there are any water tiles around mark them as missed for smarter AI shots
@@ -106,39 +114,68 @@ namespace Battleships.Tools
                         var tilesToMark = LocateShipTool.AreOppositeTilesAvaible(indexList, item.Key);
                         foreach (var tile in tilesToMark)
                         {
-                            if (tile.Value && tiles[tile.Key] == Tile.water)
+                            if (tile.Value && tiles[tile.Key].Type == TileType.water)
                             {
-                                tiles[tile.Key] = Tile.missed;
+                                tiles[tile.Key].Type = TileType.missed;
+                                database.Entry(tiles[tile.Key]).State = EntityState.Modified;
                             }
                         }
                     }
 
-                    AddOppositeDrownedTiles(gameEventDTOList, tiles, oppositeGameEventDTO.Index, shotAt);
+                    AddOppositeDrownedTiles(database, gameEventDTOList, tiles, oppositeGameEventDTO.Index, shotAt);
                 }
             }
-            //if it is one-tile ship mark water tiles around as missed
-            if (!tiles.Any(t => t.Value == Tile.shot && oppositeTiles.Any(o => o.Key == t.Key && o.Value)))
+            //if it is one-tile ship mark water tiles around as missed for smarter AI shots
+            if (!tiles.Any(t => t.Value.Type == TileType.shot && oppositeTiles.Any(o => o.Key == t.Key && o.Value)))
             {
                 foreach (var tile in oppositeTiles)
                 {
-                    if (tile.Value && tiles[tile.Key] == Tile.water)
+                    if (tile.Value && tiles[tile.Key].Type == TileType.water)
                     {
-                        tiles[tile.Key] = Tile.missed;
+                        tiles[tile.Key].Type = TileType.missed;
+                        database.Entry(tiles[tile.Key]).State = EntityState.Modified;
                     }
                 }
             }
         }
 
-        private static void MarkAnavaibleDiagonalTiles(int index, Dictionary<int, Tile> tiles)
+        public static void MarkAnavaibleDiagonalTiles(DbContext database, int index, Dictionary<int, Tile> tiles)
         {
             var diagonalAvaibility = LocateShipTool.AreDiagonalTilesAvaible(tiles.Select(t => t.Key).ToList(), index);
             foreach (var item in diagonalAvaibility)
             {
                 if (item.Value)
                 {
-                    tiles[item.Key] = Tile.missed;
+                    tiles[item.Key].Type = TileType.missed;
+                    database.Entry(tiles[item.Key]).State = EntityState.Modified;
                 }
             }
+        }
+
+        public static void SetEventTime(Game game, GameEventDTO gameEventDTO)
+        {
+            DateTime eventDate = DateTime.Now;
+            DateTime startDate = game.Startdate;
+            string time = GetTimeString(startDate, eventDate);
+            gameEventDTO.Time = time;
+        }
+
+        public static string GetTimeString(DateTime startDate, DateTime endDate)
+        {
+            string time = "";
+            string hour = (endDate - startDate).Hours.ToString("00");
+            string minute = (endDate - startDate).Minutes.ToString("00");
+            string second = (endDate - startDate).Seconds.ToString("00");
+
+            if (hour == "00")
+            {
+                time = minute + " : " + second;
+            }
+            else
+            {
+                time = hour + " : " + minute + " : " + second;
+            }
+            return time;
         }
     }
 }

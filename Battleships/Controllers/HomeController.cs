@@ -2,6 +2,7 @@
 using Battleships.Tools;
 using System;
 using System.Collections.Generic;
+using System.Data.Entity;
 using System.Linq;
 using System.Web;
 using System.Web.Mvc;
@@ -10,6 +11,8 @@ namespace Battleships.Controllers
 {
     public class HomeController : Controller
     {
+        private DatabaseContext _database = new DatabaseContext();
+
         public ActionResult Index()
         {
             ViewBag.Title = "Pirate Wars";
@@ -21,49 +24,69 @@ namespace Battleships.Controllers
             var drawnIndexList = LocateShipTool.GetRandomShips();
             return Newtonsoft.Json.JsonConvert.SerializeObject(drawnIndexList);
         }
-
-        public static List<Game> Games = new List<Game>();
         public string StartGame(List<int> shipArray)
         {
-            Game game = new Game();
-            game.GameNumber = Games.Count > 0 ? Games.Max(g => g.GameNumber) + 1 : 1;
+            var game = _database.Games.Add(new Game());
+            
             List<int> aiShips = LocateShipTool.GetRandomShips();
+
+            List<Tile> tiles = new List<Tile>();
+
             for (int i = 0; i < 100; i++)
             {
-                game.PlayerTiles.Add(i, shipArray.Contains(i) ? Tile.ship : Tile.water);
-                game.AITiles.Add(i, aiShips.Contains(i) ? Tile.ship : Tile.water);
+                //add player tile to database
+                tiles.Add(new Tile { 
+                    Number = i, 
+                    Type = shipArray.Contains(i) ? TileType.ship : TileType.water, 
+                    GameId = game.Id, 
+                    Owner = ShotAt.playerTile });
+
+                //add AI tile to database
+                tiles.Add(new Tile
+                { 
+                    Number = i, 
+                    Type = aiShips.Contains(i) ? TileType.ship : TileType.water, 
+                    GameId = game.Id, 
+                    Owner = ShotAt.aiTile });
             }
-            Games.Add(game);
-            return Newtonsoft.Json.JsonConvert.SerializeObject(game.GameNumber);
+            _database.Tiles.AddRange(tiles);
+            _database.SaveChanges();
+            return Newtonsoft.Json.JsonConvert.SerializeObject(game.Id);
         }
         public string ShootRandomly(int gameNumber)
         {
-            var game = Games.FirstOrDefault(g => g.GameNumber == gameNumber);
+            var game = _database.Games.FirstOrDefault(g => g.Id == gameNumber);
             List<GameEventDTO> gameEventDTOList = new List<GameEventDTO>();
 
             game.Sequence++;
-            var avaibleTiles = game.AITiles.Where(t => t.Value == Tile.water || t.Value == Tile.ship).Select(t => t.Key).ToList();
+            var avaibleTiles = game.AITiles.Where(t => t.Value.Type == TileType.water || t.Value.Type == TileType.ship).Select(t => t.Key).ToList();
             if (avaibleTiles.Count > 0)
             {
                 Random random = new Random(Guid.NewGuid().GetHashCode());
                 var randomIndex = random.Next(0, avaibleTiles.Count - 1);
-                ShootTool.TryShot(game, avaibleTiles[randomIndex], ShotAt.aiTile, gameEventDTOList);
+                ShootTool.TryShot(_database, game, avaibleTiles[randomIndex], ShotAt.aiTile, gameEventDTOList);
+
+                _database.Entry(game).State = EntityState.Modified;
+                _database.SaveChanges();
             }
             return Newtonsoft.Json.JsonConvert.SerializeObject(gameEventDTOList);
         }
         public string Shoot(int gameNumber, int index)
         {
-            var game = Games.FirstOrDefault(g => g.GameNumber == gameNumber);
+            var game = _database.Games.FirstOrDefault(g => g.Id == gameNumber);
             List<GameEventDTO> gameEventDTOList = new List<GameEventDTO>();
             game.Sequence++;
-            ShootTool.TryShot(game, index, ShotAt.aiTile, gameEventDTOList);
+            ShootTool.TryShot(_database, game, index, ShotAt.aiTile, gameEventDTOList);
+
+            _database.Entry(game).State = EntityState.Modified;
+            _database.SaveChanges();
 
             return Newtonsoft.Json.JsonConvert.SerializeObject(gameEventDTOList);
         }
         public string AIShot(int gameNumber)
         {
             List<GameEventDTO> gameEventDTOList = new List<GameEventDTO>();
-            var game = Games.FirstOrDefault(g => g.GameNumber == gameNumber);
+            var game = _database.Games.FirstOrDefault(g => g.Id == gameNumber);
             var tiles = game.PlayerTiles.Select(t => t.Key).ToList();
 
             Random random = new Random(Guid.NewGuid().GetHashCode());
@@ -71,14 +94,14 @@ namespace Battleships.Controllers
 
             do
             {
-                avaibleTiles = game.PlayerTiles.Where(t => t.Value == Tile.water || t.Value == Tile.ship).Select(t => t.Key).ToList();
+                avaibleTiles = game.PlayerTiles.Where(t => t.Value.Type == TileType.water || t.Value.Type == TileType.ship).Select(t => t.Key).ToList();
 
                 if (avaibleTiles.Count > 0)
                 {
-                    //If there are player tiles shot make only opposite tiles avaible
-                    if (game.PlayerTiles.ContainsValue(Tile.shot))
+                    //If there are shot player tiles make only opposite tiles avaible
+                    if (game.PlayerTiles.Any(t=>t.Value.Type == TileType.shot))
                     {
-                        foreach (var playerTile in game.PlayerTiles.Where(p => p.Value == Tile.shot))
+                        foreach (var playerTile in game.PlayerTiles.Where(p => p.Value.Type == TileType.shot))
                         {
                             var index = playerTile.Key;
                             avaibleTiles = new List<int>();
@@ -86,7 +109,7 @@ namespace Battleships.Controllers
                             var avaibleTilesDictionary = LocateShipTool.AreOppositeTilesAvaible(tiles, index);
                             foreach (var avaibleTile in avaibleTilesDictionary)
                             {
-                                if (avaibleTile.Value && (game.PlayerTiles[avaibleTile.Key] == Tile.ship || game.PlayerTiles[avaibleTile.Key] == Tile.water))
+                                if (avaibleTile.Value && (game.PlayerTiles[avaibleTile.Key].Type == TileType.ship || game.PlayerTiles[avaibleTile.Key].Type == TileType.water))
                                 {
                                     avaibleTiles.Add(avaibleTile.Key);
                                 }
@@ -98,23 +121,88 @@ namespace Battleships.Controllers
                         }
                     }
                     var randomIndex = random.Next(0, avaibleTiles.Count - 1);
-                    ShootTool.TryShot(game, avaibleTiles[randomIndex], ShotAt.playerTile, gameEventDTOList);
+                    ShootTool.TryShot(_database, game, avaibleTiles[randomIndex], ShotAt.playerTile, gameEventDTOList);
                 }
-            } while (gameEventDTOList[gameEventDTOList.Count - 1].Tile != Tile.missed && game.PlayerTiles.ContainsValue(Tile.ship));
+            } while (gameEventDTOList[gameEventDTOList.Count - 1].Tile != TileType.missed && game.PlayerTiles.Any(t=>t.Value.Type == TileType.ship));
+
+            _database.SaveChanges();
 
             return Newtonsoft.Json.JsonConvert.SerializeObject(gameEventDTOList);
         }
 
         public string CheckVictoryOrDefeat(int gameNumber, ShotAt shotAt)
         {
-            var game = Games.FirstOrDefault(g => g.GameNumber == gameNumber);
+            var game = _database.Games.FirstOrDefault(g => g.Id == gameNumber);
             var tiles = shotAt == ShotAt.aiTile ? game.AITiles : game.PlayerTiles;
 
-            if (tiles.ContainsValue(Tile.ship))
+            if (tiles.Any(t=>t.Value.Type == TileType.ship))
             {
                 return Newtonsoft.Json.JsonConvert.SerializeObject(false);
             }
+            game.FinishDate = DateTime.Now;
+
+            _database.Entry(game).State = EntityState.Modified;
+            _database.SaveChanges();
+
             return Newtonsoft.Json.JsonConvert.SerializeObject(true);
+        }
+        public string GetRankingRows()
+        {
+            var games = _database.Games.ToList();
+            List<Game> wonAndFinishedGames = games.Where(g => !g.AITiles.Any(t=>t.Value.Type == TileType.ship)).ToList();
+            List<RankingRowDTO> sortedRows = wonAndFinishedGames.OrderBy(g => g.Sequence)
+                                                                .ThenBy(g => g.FinishDate - g.Startdate)
+                                                                .ThenBy(g => g.Startdate)
+                                                                .Take(8)
+                                                                .Select(g => new RankingRowDTO(g))
+                                                                .ToList();
+            return Newtonsoft.Json.JsonConvert.SerializeObject(sortedRows);
+        }
+        public string QualifyForRanking(int gameNumber)
+        {
+            var games = _database.Games.ToList();
+            var game = games.FirstOrDefault(g => g.Id == gameNumber);
+            
+            List<Game> wonAndFinishedGames = games.Where(g => !g.AITiles.Any(t=>t.Value.Type == TileType.ship)).ToList();
+            List<Game> sortedGames = wonAndFinishedGames.OrderBy(g => g.Sequence)
+                                                                .ThenBy(g => g.FinishDate - g.Startdate)
+                                                                .ThenBy(g => g.Startdate)
+                                                                .Take(8)
+                                                                .ToList();
+            bool qualified = true;
+
+            if (sortedGames.Count < 8)
+            {
+                return Newtonsoft.Json.JsonConvert.SerializeObject(qualified);
+            }
+            foreach (var rankingGame in sortedGames)
+            {
+                if (rankingGame.Sequence < game.Sequence)
+                {
+                    return Newtonsoft.Json.JsonConvert.SerializeObject(qualified);
+                }
+                else if (rankingGame.Sequence == game.Sequence)
+                {
+                    if ((rankingGame.FinishDate - rankingGame.Startdate) < (game.FinishDate - game.Startdate))
+                    {
+                        return Newtonsoft.Json.JsonConvert.SerializeObject(qualified);
+                    }
+                }
+            }
+
+            qualified = false;
+            return Newtonsoft.Json.JsonConvert.SerializeObject(qualified);
+        }
+        public void SetNickname(int gameNumber, string nickname)
+        {
+            if (!string.IsNullOrEmpty(nickname))
+            {
+                var game = _database.Games.FirstOrDefault(g => g.Id == gameNumber);
+                game.PlayerNick = nickname;
+
+                _database.Entry(game).State = EntityState.Modified;
+                _database.SaveChanges();
+            }
         }
     }
 }

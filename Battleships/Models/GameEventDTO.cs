@@ -18,9 +18,9 @@ namespace Battleships.Models
         public ShotAt ShotAt { get; set; }
         public int Index { get; set; }
         [JsonConverter(typeof(StringEnumConverter))]
-        public Tile Tile { get; set; }
+        public TileType Tile { get; set; }
         public int Sequence { get; set; }
         public bool IsVisible { get; set; }
+        public string Time { get; set; }
     }
-    public enum ShotAt { aiTile, playerTile}
 }
