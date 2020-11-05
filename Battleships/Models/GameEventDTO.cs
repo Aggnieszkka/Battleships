@@ -13,9 +13,7 @@ namespace Battleships.Models
         {
             IsVisible = true;
         }
-        public long GameNumber { get; set; }
-        [JsonConverter(typeof(StringEnumConverter))]
-        public ShotAt ShotAt { get; set; }
+        public int GameNumber { get; set; }
         public int Index { get; set; }
         [JsonConverter(typeof(StringEnumConverter))]
         public TileType Tile { get; set; }

@@ -27,27 +27,33 @@ namespace Battleships.Controllers
         public string StartGame(List<int> shipArray)
         {
             var game = _database.Games.Add(new Game());
-            
+
             List<int> aiShips = LocateShipTool.GetRandomShips();
 
             List<Tile> tiles = new List<Tile>();
 
-            for (int i = 0; i < 100; i++)
+            //add player ship tiles to database
+            foreach (var index in shipArray)
             {
-                //add player tile to database
-                tiles.Add(new Tile { 
-                    Number = i, 
-                    Type = shipArray.Contains(i) ? TileType.ship : TileType.water, 
-                    GameId = game.Id, 
-                    Owner = ShotAt.playerTile });
-
-                //add AI tile to database
                 tiles.Add(new Tile
-                { 
-                    Number = i, 
-                    Type = aiShips.Contains(i) ? TileType.ship : TileType.water, 
-                    GameId = game.Id, 
-                    Owner = ShotAt.aiTile });
+                {
+                    Number = index,
+                    Type = TileType.ship,
+                    GameId = game.Id,
+                    Owner = ShotAt.playerTile
+                });
+            }
+
+            //add AI ship tiles to database
+            foreach (var index in aiShips)
+            {
+                tiles.Add(new Tile
+                {
+                    Number = index,
+                    Type = TileType.ship,
+                    GameId = game.Id,
+                    Owner = ShotAt.aiTile
+                });
             }
             _database.Tiles.AddRange(tiles);
             _database.SaveChanges();
@@ -58,16 +64,19 @@ namespace Battleships.Controllers
             var game = _database.Games.FirstOrDefault(g => g.Id == gameNumber);
             List<GameEventDTO> gameEventDTOList = new List<GameEventDTO>();
 
-            game.Sequence++;
-            var avaibleTiles = game.AITiles.Where(t => t.Value.Type == TileType.water || t.Value.Type == TileType.ship).Select(t => t.Key).ToList();
-            if (avaibleTiles.Count > 0)
+            if (game != null)
             {
-                Random random = new Random(Guid.NewGuid().GetHashCode());
-                var randomIndex = random.Next(0, avaibleTiles.Count - 1);
-                ShootTool.TryShot(_database, game, avaibleTiles[randomIndex], ShotAt.aiTile, gameEventDTOList);
+                game.Sequence++;
+                var availableTiles = game.AITiles.Where(t => t.Value.Type == TileType.water || t.Value.Type == TileType.ship).Select(t => t.Key).ToList();
+                if (availableTiles.Count > 0)
+                {
+                    Random random = new Random(Guid.NewGuid().GetHashCode());
+                    var randomIndex = random.Next(0, availableTiles.Count - 1);
+                    ShootTool.TryShot(_database, game, availableTiles[randomIndex], ShotAt.aiTile, gameEventDTOList);
 
-                _database.Entry(game).State = EntityState.Modified;
-                _database.SaveChanges();
+                    _database.Entry(game).State = EntityState.Modified;
+                    _database.SaveChanges();
+                }
             }
             return Newtonsoft.Json.JsonConvert.SerializeObject(gameEventDTOList);
         }
@@ -75,67 +84,79 @@ namespace Battleships.Controllers
         {
             var game = _database.Games.FirstOrDefault(g => g.Id == gameNumber);
             List<GameEventDTO> gameEventDTOList = new List<GameEventDTO>();
-            game.Sequence++;
-            ShootTool.TryShot(_database, game, index, ShotAt.aiTile, gameEventDTOList);
+            if (game != null && (game.AITiles[index].Type == TileType.water || game.AITiles[index].Type == TileType.ship))
+            {
+                game.Sequence++;
+                ShootTool.TryShot(_database, game, index, ShotAt.aiTile, gameEventDTOList);
 
-            _database.Entry(game).State = EntityState.Modified;
-            _database.SaveChanges();
-
+                _database.Entry(game).State = EntityState.Modified;
+                _database.SaveChanges();
+            }
             return Newtonsoft.Json.JsonConvert.SerializeObject(gameEventDTOList);
         }
         public string AIShot(int gameNumber)
         {
             List<GameEventDTO> gameEventDTOList = new List<GameEventDTO>();
             var game = _database.Games.FirstOrDefault(g => g.Id == gameNumber);
-            var tiles = game.PlayerTiles.Select(t => t.Key).ToList();
-
-            Random random = new Random(Guid.NewGuid().GetHashCode());
-            List<int> avaibleTiles = new List<int>();
-
-            do
+            if (game != null)
             {
-                avaibleTiles = game.PlayerTiles.Where(t => t.Value.Type == TileType.water || t.Value.Type == TileType.ship).Select(t => t.Key).ToList();
+                var tiles = game.PlayerTiles.Select(t => t.Key).ToList();
 
-                if (avaibleTiles.Count > 0)
+                Random random = new Random(Guid.NewGuid().GetHashCode());
+                List<int> availableTiles = new List<int>();
+
+                do
                 {
-                    //If there are shot player tiles make only opposite tiles avaible
-                    if (game.PlayerTiles.Any(t=>t.Value.Type == TileType.shot))
-                    {
-                        foreach (var playerTile in game.PlayerTiles.Where(p => p.Value.Type == TileType.shot))
-                        {
-                            var index = playerTile.Key;
-                            avaibleTiles = new List<int>();
+                    availableTiles = game.PlayerTiles
+                                    .Where(t => t.Value.Type == TileType.water || t.Value.Type == TileType.ship)
+                                    .Select(t => t.Key)
+                                    .ToList();
 
-                            var avaibleTilesDictionary = LocateShipTool.AreOppositeTilesAvaible(tiles, index);
-                            foreach (var avaibleTile in avaibleTilesDictionary)
+                    if (availableTiles.Count > 0)
+                    {
+                        //If there are shot player tiles make only opposite tiles avaible
+                        if (game.PlayerTiles.Any(t => t.Value.Type == TileType.shot))
+                        {
+                            foreach (var playerTile in game.PlayerTiles.Where(p => p.Value.Type == TileType.shot))
                             {
-                                if (avaibleTile.Value && (game.PlayerTiles[avaibleTile.Key].Type == TileType.ship || game.PlayerTiles[avaibleTile.Key].Type == TileType.water))
+                                var index = playerTile.Key;
+                                availableTiles = new List<int>();
+
+                                var avaibleTilesDictionary = LocateShipTool.AreOppositeTilesAvailable(tiles, index);
+                                foreach (var availableTile in avaibleTilesDictionary)
                                 {
-                                    avaibleTiles.Add(avaibleTile.Key);
+                                    if (availableTile.Value && (game.PlayerTiles[availableTile.Key].Type == TileType.ship || game.PlayerTiles[availableTile.Key].Type == TileType.water))
+                                    {
+                                        availableTiles.Add(availableTile.Key);
+                                    }
+                                }
+                                if (availableTiles.Count > 0)
+                                {
+                                    break;
                                 }
                             }
-                            if (avaibleTiles.Count > 0)
-                            {
-                                break;
-                            }
                         }
+                        var randomIndex = random.Next(0, availableTiles.Count - 1);
+                        ShootTool.TryShot(_database, game, availableTiles[randomIndex], ShotAt.playerTile, gameEventDTOList);
                     }
-                    var randomIndex = random.Next(0, avaibleTiles.Count - 1);
-                    ShootTool.TryShot(_database, game, avaibleTiles[randomIndex], ShotAt.playerTile, gameEventDTOList);
-                }
-            } while (gameEventDTOList[gameEventDTOList.Count - 1].Tile != TileType.missed && game.PlayerTiles.Any(t=>t.Value.Type == TileType.ship));
+                } while (gameEventDTOList[gameEventDTOList.Count - 1].Tile != TileType.missed && game.PlayerTiles.Any(t => t.Value.Type == TileType.ship));
 
-            _database.SaveChanges();
-
+                _database.SaveChanges();
+            }
             return Newtonsoft.Json.JsonConvert.SerializeObject(gameEventDTOList);
         }
 
         public string CheckVictoryOrDefeat(int gameNumber, ShotAt shotAt)
         {
             var game = _database.Games.FirstOrDefault(g => g.Id == gameNumber);
+            if (game == null)
+            {
+                return Newtonsoft.Json.JsonConvert.SerializeObject(false);
+            }
+
             var tiles = shotAt == ShotAt.aiTile ? game.AITiles : game.PlayerTiles;
 
-            if (tiles.Any(t=>t.Value.Type == TileType.ship))
+            if (tiles.Any(t => t.Value.Type == TileType.ship))
             {
                 return Newtonsoft.Json.JsonConvert.SerializeObject(false);
             }
@@ -149,7 +170,7 @@ namespace Battleships.Controllers
         public string GetRankingRows()
         {
             var games = _database.Games.ToList();
-            List<Game> wonAndFinishedGames = games.Where(g => !g.AITiles.Any(t=>t.Value.Type == TileType.ship)).ToList();
+            List<Game> wonAndFinishedGames = games.Where(g => !g.AITiles.Any(t => t.Value.Type == TileType.ship)).ToList();
             List<RankingRowDTO> sortedRows = wonAndFinishedGames.OrderBy(g => g.Sequence)
                                                                 .ThenBy(g => g.FinishDate - g.Startdate)
                                                                 .ThenBy(g => g.Startdate)
@@ -162,8 +183,8 @@ namespace Battleships.Controllers
         {
             var games = _database.Games.ToList();
             var game = games.FirstOrDefault(g => g.Id == gameNumber);
-            
-            List<Game> wonAndFinishedGames = games.Where(g => !g.AITiles.Any(t=>t.Value.Type == TileType.ship)).ToList();
+
+            List<Game> wonAndFinishedGames = games.Where(g => !g.AITiles.Any(t => t.Value.Type == TileType.ship)).ToList();
             List<Game> sortedGames = wonAndFinishedGames.OrderBy(g => g.Sequence)
                                                                 .ThenBy(g => g.FinishDate - g.Startdate)
                                                                 .ThenBy(g => g.Startdate)
@@ -204,5 +225,7 @@ namespace Battleships.Controllers
                 _database.SaveChanges();
             }
         }
+
+        public List<int> availableTiles { get; set; }
     }
 }

@@ -111,13 +111,13 @@ function startGame() {
         changeButtonAccess("randomShot");
 
         let startDate = new Date();
-        startTime = startDate.getTime() / 1000; 
+        startTime = startDate.getTime() / 1000;
 
         $("#historyInfo").html("00 : 00 -- START<br/>" + $("#historyInfo").html());
     }
 }
 
-function startNewGame() { //to do: kliknięcie w trakcie strzelania komputera zostawia kliknięte kafelki
+function startNewGame() { 
     if ($('#newGame').hasClass("horizontalMenuButton")) {
 
         showBoards();
@@ -125,12 +125,14 @@ function startNewGame() { //to do: kliknięcie w trakcie strzelania komputera zo
         changeButtonAccess("addShip");
         changeButtonAccess("randomShips");
         changeButtonAccess("newGame");
+        gameNumber = -1;
         if ($("#randomShot").hasClass("horizontalMenuButton")) {
             changeButtonAccess("randomShot");
         }
 
         playerWon = false;
         AIWon = false;
+        tileLock = false;
 
         $("#historyInfo").html("New game<br/>" + $("#historyInfo").html());
     }
@@ -216,13 +218,15 @@ function aiShot() {
             tileLock = true;
             for (i = 0; i < list.length; i++) {
                 setTimeout(function (list, i) {
-                    markPlayerTiles(list[i].Tile, list[i].Index, list[i].IsVisible, list[i].Time);
-                    if (i == list.length - 1) {
-                        tileLock = false;
-                        if (list.map(function (item) {
-                         return item.Tile;
-                        }).includes("drowned")) {
-                            checkVictoryOrDefeat("playerTile", list[0].Time);
+                    if (list[i].GameNumber == gameNumber) {
+                        markPlayerTiles(list[i].Tile, list[i].Index, list[i].IsVisible, list[i].Time);
+                        if (i == list.length - 1) {
+                            tileLock = false;
+                            if (list.map(function (item) {
+                             return item.Tile;
+                            }).includes("drowned")) {
+                                checkVictoryOrDefeat("playerTile", list[0].Time);
+                            }
                         }
                     }
                 }, 300 * (i + 1), list, i);
@@ -304,7 +308,7 @@ function qualifyForRanking() {
         {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ gameNumber: gameNumber})
+            body: JSON.stringify({ gameNumber: gameNumber })
         })
         .then(function (resp) {
             return resp.json();
@@ -344,7 +348,7 @@ function getRankingRows() {
         return resp.json();
     })
     .then(function (rankingRows) {
-    
+
         let divContent = "";
         let cellClass = "";
         let number = "";
@@ -388,12 +392,12 @@ function getRankingRows() {
     });
 }
 function setNickname(nickname) {
-        fetch(getQueryPath("Home/SetNickname"),
-    {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ gameNumber: gameNumber, nickname: nickname })
-    })
+    fetch(getQueryPath("Home/SetNickname"),
+{
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ gameNumber: gameNumber, nickname: nickname })
+})
 }
 
 $("#playButton").on("click", function () { changeSectionDisplay("mainMenuSection", "boardSection") });

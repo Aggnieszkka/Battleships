@@ -19,21 +19,35 @@ namespace Battleships.Models
         }
         public int Id { get; set; }
         [NotMapped]
-        public Dictionary<int, Tile> PlayerTiles 
+        public Dictionary<int, Tile> PlayerTiles
         {
             get
             {
                 if (Tiles == null)
                     Tiles = new List<Tile>();
-                return Tiles.Where(t=>t.Owner == ShotAt.playerTile).ToDictionary(v => v.Number, v => v);
+                Dictionary<int, Tile> playerTiles = Tiles.Where(t => t.Owner == ShotAt.playerTile).ToDictionary(t => t.Number, t => t);
+
+                for (int i = 0; i < 100; i++)
+                {
+                    if (!playerTiles.ContainsKey(i))
+                    {
+                        playerTiles.Add(i, new Tile
+                        {
+                            Number = i,
+                            GameId = Id,
+                            Owner = ShotAt.playerTile,
+                            Type = TileType.water
+                        });
+                    }
+                }
+                return playerTiles.OrderBy(t => t.Key).ToDictionary(t => t.Key, t => t.Value);
             }
             set
             {
+                List<Tile> aiTiles = Tiles != null ? Tiles.Where(t => t.Owner == ShotAt.aiTile).ToList() : new List<Tile>();
                 Tiles = new List<Tile>();
-                foreach (var tile in value)
-                {
-                    Tiles.Add(tile.Value);
-                }
+                Tiles.AddRange(value.Values);
+                Tiles.AddRange(aiTiles);
             }
         }
         public virtual List<Tile> Tiles { get; set; }
@@ -44,18 +58,32 @@ namespace Battleships.Models
             {
                 if (Tiles == null)
                     Tiles = new List<Tile>();
-                return Tiles.Where(t=>t.Owner == ShotAt.aiTile).ToDictionary(v => v.Number, v => v);
+                Dictionary<int, Tile> aiTiles = Tiles.Where(t => t.Owner == ShotAt.aiTile).ToDictionary(t => t.Number, t => t);
+
+                for (int i = 0; i < 100; i++)
+                {
+                    if (!aiTiles.ContainsKey(i))
+                    {
+                        aiTiles.Add(i, new Tile
+                        {
+                            Number = i,
+                            GameId = Id,
+                            Owner = ShotAt.aiTile,
+                            Type = TileType.water
+                        });
+                    }
+                }
+                return aiTiles.OrderBy(t => t.Key).ToDictionary(t => t.Key, t => t.Value);
             }
             set
             {
+                List<Tile> playerTiles = Tiles != null ? Tiles.Where(t => t.Owner == ShotAt.playerTile).ToList() : new List<Tile>();
                 Tiles = new List<Tile>();
-                foreach (var tile in value)
-                {
-                    Tiles.Add(tile.Value);
-                }
+                Tiles.AddRange(value.Values);
+                Tiles.AddRange(playerTiles);
             }
         }
-        
+
         public int Sequence { get; set; }
         public DateTime Startdate { get; set; }
         public DateTime FinishDate { get; set; }
