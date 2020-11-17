@@ -198,7 +198,7 @@ namespace Battleships.Controllers
             }
             foreach (var rankingGame in sortedGames)
             {
-                if (rankingGame.Sequence < game.Sequence)
+                if (rankingGame.Sequence > game.Sequence)
                 {
                     return Newtonsoft.Json.JsonConvert.SerializeObject(qualified);
                 }

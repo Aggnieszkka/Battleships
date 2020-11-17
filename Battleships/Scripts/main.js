@@ -39,17 +39,17 @@ function getRandomShips() {
 }
 
 function placePlayerShips(idArray) {
-    for (i = 0; i < 100; i++) {
+    for (let i = 0; i < 100; i++) {
         revealTile("playerTile" + i, "water", 0);
     }
-    for (i = 0; i < idArray.length; i++) {
+    for (let i = 0; i < idArray.length; i++) {
         revealTile("playerTile" + idArray[i], "ship", 0);
         shipArray[i] = idArray[i];
     }
 }
 
 function revealTile(id, type, time) {
-    var chosenType;
+    let chosenType;
     if (type == "missed") {
         $("#historyInfo").html(time
             + "<span style='color: green'> -- Missed. Computer's turn. Shot count: "
@@ -186,7 +186,7 @@ function shootRandomly() {
 function resolveShot(list) {
     gameSequence = list[0].Sequence;
     tileLock = true;
-    for (i = 0; i < list.length; i++) {
+    for (let i = 0; i < list.length; i++) {
         setTimeout(function (list, i) {
             revealTile("AITile" + list[i].Index, list[i].Tile, list[i].Time);
             if (i == list.length - 1) {
@@ -216,7 +216,7 @@ function aiShot() {
         .then(function (list) {
 
             tileLock = true;
-            for (i = 0; i < list.length; i++) {
+            for (let i = 0; i < list.length; i++) {
                 setTimeout(function (list, i) {
                     if (list[i].GameNumber == gameNumber) {
                         markPlayerTiles(list[i].Tile, list[i].Index, list[i].IsVisible, list[i].Time);
@@ -235,7 +235,7 @@ function aiShot() {
 }
 
 function markPlayerTiles(tile, index, visible, time) {
-    var chosenType;
+    let chosenType;
     if (tile == "missed") {
         chosenType = "url(../img/missed.png)";
         $("#historyInfo").html(time
@@ -283,9 +283,7 @@ function checkVictoryOrDefeat(shotAt, time) {
                     + $("#historyInfo").html());
                 playerWon = true;
                 removeEventFromAITiles();
-                if (qualifyForRanking()) {
-                    $('#nicknameModal').modal({ backdrop: false });
-                }
+                qualifyForRanking();
             }
             else if (shotAt == "playerTile" && ended) {
                 $("#historyInfo").html(time
@@ -314,7 +312,9 @@ function qualifyForRanking() {
             return resp.json();
         })
         .then(function (qualified) {
-            return qualified;
+            if (qualified) {
+                $('#nicknameModal').modal({ backdrop: false });
+            }
         });
 }
 
@@ -416,13 +416,13 @@ $("#okButton").on("click", function () { setNickname($("#nickname").val()); $("#
 showBoards();
 updateRanking();
 
-var shipArray = [];
-var gameNumber;
-var gameSequence;
-var playerWon = false;
-var AIWon = false;
-var tileLock = false;
+let shipArray = [];
+let gameNumber;
+let gameSequence;
+let playerWon = false;
+let AIWon = false;
+let tileLock = false;
 
-var startHour;
-var startMinute;
-var startSecond;
+let startHour;
+let startMinute;
+let startSecond;
